@@ -6,7 +6,7 @@ import { nanoid } from 'nanoid/async'
 export async function urlsShortenPOST(req, res) {
     try {
         
-        const {id} = res.locals;
+        const {userId} = res.locals;
         const data = req.body;
 
         
@@ -29,7 +29,7 @@ export async function urlsShortenPOST(req, res) {
 
         const shortUrl = await nanoid(8);
 
-        await connection.query('INSERT INTO urls ("userId", url, "shortUrl") VALUES ($1, $2, $3)', [id, data.url, shortUrl]);
+        await connection.query('INSERT INTO urls ("userId", url, "shortUrl") VALUES ($1, $2, $3)', [userId, data.url, shortUrl]);
         res.status(201).send({
             shortUrl: shortUrl
         });
@@ -122,6 +122,7 @@ export async function urlsOpenShortUrlGET(req, res) {
             return;
         }
 
+        await connection.query('INSERT INTO visits ("urlId") VALUES ($1)', [result.rows[0].id])
         
         /* REDIRECT */
 
@@ -130,6 +131,61 @@ export async function urlsOpenShortUrlGET(req, res) {
 
     } catch (error) {
         console.log(`urlsOpenShortUrlGET - ${error}`);
+        res.sendStatus(500);
+    }
+}
+
+
+export async function urlsIdDELETE(req, res) {
+    try {
+        
+        const data = req.params;
+        data.id = Number(data.id);
+
+        
+        /* VALIDATION (JOI) */
+
+        const dataSchema = joi.object({
+            id: joi.number().integer().min(1).required()
+        });
+
+        const validation = dataSchema.validate(data);
+
+        if (validation.error) {
+            console.log(`urlsIdDELETE/VALIDATION (JOI) - ${validation.error}`);
+            res.status(404).send(validation.error);
+            return;
+        }
+        
+        
+        /* SEARCH IN THE DATABASE */
+
+        const result = await connection.query('SELECT * FROM urls WHERE id = $1 AND active = true', [data.id]);
+
+        if(!result.rows[0]) {
+            console.log(`urlsIdDELETE/SEARCH IN THE DATABASE`);
+            res.sendStatus(404);
+            return;
+        }
+        
+        
+        /* IS THIS USER? */
+
+        if(result.rows[0].userId !== res.locals.userId) {
+            console.log(`urlsIdDELETE/IS THIS USER?`);
+            res.sendStatus(401);
+            return;
+        }
+        
+        
+        /* DELETE IN THE DATABASE */
+
+        await connection.query('UPDATE urls SET active = false WHERE id = $1', [data.id]);
+        res.sendStatus(204);
+
+
+    } catch (error) {
+        console.log(`urlsIdDELETE - ${error}`);
         res.sendStatus(500);
     }
 }

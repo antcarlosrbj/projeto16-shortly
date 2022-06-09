@@ -43,7 +43,7 @@ export async function verifyToken(req, res, next) {
             }
             
             
-            res.locals.id = result.rows[0].id;
+            res.locals.userId = result.rows[0].id;
             next();
         });
         
