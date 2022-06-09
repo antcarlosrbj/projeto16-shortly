@@ -47,7 +47,7 @@ export async function urlsIdGET(req, res) {
         
         const data = req.params;
         data.id = Number(data.id)
-        
+
         
         /* VALIDATION (JOI) */
 
@@ -86,6 +86,50 @@ export async function urlsIdGET(req, res) {
 
     } catch (error) {
         console.log(`urlsIdGET - ${error}`);
+        res.sendStatus(500);
+    }
+}
+
+
+export async function urlsOpenShortUrlGET(req, res) {
+    try {
+        
+        const data = req.params;
+
+        
+        /* VALIDATION (JOI) */
+
+        const dataSchema = joi.object({
+            shortUrl: joi.string().alphanum().min(8).max(8).required()
+        });
+
+        const validation = dataSchema.validate(data);
+
+        if (validation.error) {
+            console.log(`urlsOpenShortUrlGET/VALIDATION (JOI) - ${validation.error}`);
+            res.status(404).send(validation.error);
+            return;
+        }
+        
+        
+        /* SEARCH IN THE DATABASE */
+
+        const result = await connection.query('SELECT * FROM urls WHERE "shortUrl" = $1 AND active = true', [data.shortUrl]);
+
+        if(!result.rows[0]) {
+            console.log(`urlsOpenShortUrlGET/SEARCH IN THE DATABASE`);
+            res.sendStatus(404);
+            return;
+        }
+
+        
+        /* REDIRECT */
+
+        res.redirect(result.rows[0].url);
+
+
+    } catch (error) {
+        console.log(`urlsOpenShortUrlGET - ${error}`);
         res.sendStatus(500);
     }
 }
