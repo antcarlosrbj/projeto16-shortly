@@ -100,7 +100,7 @@ export async function urlsOpenShortUrlGET(req, res) {
         /* VALIDATION (JOI) */
 
         const dataSchema = joi.object({
-            shortUrl: joi.string().alphanum().min(8).max(8).required()
+            shortUrl: joi.string().min(8).max(8).required()
         });
 
         const validation = dataSchema.validate(data);
@@ -122,7 +122,7 @@ export async function urlsOpenShortUrlGET(req, res) {
             return;
         }
 
-        await connection.query('INSERT INTO visits ("urlId") VALUES ($1)', [result.rows[0].id])
+        await connection.query('UPDATE urls SET "visitCount" = $1 WHERE id = $2', [result.rows[0].visitCount+1, result.rows[0].id])
         
         /* REDIRECT */
 
@@ -186,6 +186,78 @@ export async function urlsIdDELETE(req, res) {
 
     } catch (error) {
         console.log(`urlsIdDELETE - ${error}`);
+        res.sendStatus(500);
+    }
+}
+
+
+export async function usersIdGET(req, res) {
+    try {
+        
+        const data = req.params;
+        data.id = Number(data.id)
+
+        
+        /* VALIDATION (JOI) */
+
+        const dataSchema = joi.object({
+            id: joi.number().integer().min(1).required()
+        });
+
+        const validation = dataSchema.validate(data);
+
+        if (validation.error) {
+            console.log(`usersIdGET/VALIDATION (JOI) - ${validation.error}`);
+            res.status(404).send(validation.error);
+            return;
+        }
+        
+
+        /* SEARCH IN THE DATABASE */
+
+        const user = await connection.query('SELECT * FROM users WHERE id = $1', [data.id]);
+
+        if(!user.rows[0]) {
+            console.log(`usersIdGET/SEARCH IN THE DATABASE`);
+            res.sendStatus(404);
+            return;
+        }
+
+        const urls = await connection.query('SELECT * FROM urls WHERE "userId" = $1 AND active = true', [data.id]);
+
+
+        /* IS THIS USER? */
+
+        if(user.rows[0].id !== res.locals.userId) {
+            console.log(`usersIdGET/IS THIS USER?`);
+            res.sendStatus(401);
+            return;
+        }
+
+        
+        /* DATA SUBMISSION */
+
+        let visitCount = 0;
+        for (let i = 0; i < urls.rows.length; i++) {
+            visitCount += urls.rows[i].visitCount;
+            delete urls.rows[i].userId;
+            delete urls.rows[i].createdAt;
+            delete urls.rows[i].active;
+        }
+
+        const answer = {...user.rows[0]};
+        delete answer.email;
+        delete answer.password;
+        delete answer.createdAt;
+        answer.visitCount = visitCount;
+        answer.shortenedUrls = urls.rows;
+
+
+        res.send(answer);
+
+
+    } catch (error) {
+        console.log(`usersIdGET - ${error}`);
         res.sendStatus(500);
     }
 }
