@@ -261,3 +261,23 @@ export async function usersIdGET(req, res) {
         res.sendStatus(500);
     }
 }
+
+
+export async function ranking(req, res) {
+    try {
+
+        /* SEARCH IN THE DATABASE */
+
+        const result = await connection.query('SELECT users.id, users.name, count(urls.id) AS "linksCount", coalesce(sum(urls."visitCount"), 0) AS "visitCount" FROM users LEFT JOIN urls ON users.id = urls."userId" GROUP BY users.id ORDER BY "visitCount" DESC LIMIT 10');
+        
+        
+        /* DATA SUBMISSION */
+
+        res.send(result.rows);
+
+
+    } catch (error) {
+        console.log(`ranking - ${error}`);
+        res.sendStatus(500);
+    }
+}
